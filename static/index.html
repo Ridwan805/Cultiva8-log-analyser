@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Cultive8 Local AI Security Log Analyzer - Offline security log investigation using local Qwen3.5 LLM and cross-file correlation.">
+  <title>Cultive8 | Local Security Analyzer</title>
+
+  <style>
+    /* -------------------------------------------------------------
+       CSS Variables & Base Theme
+    ------------------------------------------------------------- */
+    :root {
+      --bg-canvas: #0b1020;
+      --bg-panel: #141c30;
+      --bg-card: #0e1628;
+      --bg-metric: #121a2b;
+      --border-panel: #2b3751;
+      --border-card: #202b42;
+      --text-main: #e9f0ff;
+      --text-muted: #95a5c3;
+      --accent-mint: #60dfbb;
+      --accent-mint-hover: #4ecfa9;
+      --font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-family: var(--font-family);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* -------------------------------------------------------------
+       Layout & Container
+    ------------------------------------------------------------- */
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 36px 20px 60px;
+    }
+
+    .app-header {
+      margin-bottom: 24px;
+    }
+
+    .brand {
+      color: var(--accent-mint);
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      font-size: 13px;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand::before {
+      content: "";
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-mint);
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .hero-title {
+      font-size: clamp(30px, 5vw, 46px);
+      letter-spacing: -0.04em;
+      margin: 10px 0 8px;
+      font-weight: 800;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin: 0;
+    }
+
+    /* -------------------------------------------------------------
+       Panels & Sections
+    ------------------------------------------------------------- */
+    .panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-panel);
+      border-radius: 16px;
+      padding: 24px;
+      margin: 20px 0;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 0;
+      margin-bottom: 18px;
+      font-size: 20px;
+      font-weight: 700;
+    }
+
+    /* -------------------------------------------------------------
+       Form Controls & Actions
+    ------------------------------------------------------------- */
+    .file-input-wrapper {
+      margin-bottom: 16px;
+    }
+
+    .file-input-wrapper input[type="file"] {
+      padding: 14px;
+      width: 100%;
+      background: #0d1425;
+      border: 1px dashed #486180;
+      color: #eef;
+      border-radius: 10px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .file-input-wrapper input[type="file"]:hover {
+      border-color: var(--accent-mint);
+    }
+
+    .action-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    button.btn-primary {
+      border: 0;
+      padding: 12px 24px;
+      background: var(--accent-mint);
+      color: #0b1020;
+      border-radius: 9px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s, opacity 0.2s;
+    }
+
+    button.btn-primary:hover:not(:disabled) {
+      background: var(--accent-mint-hover);
+      transform: translateY(-1px);
+    }
+
+    button.btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .status-text {
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .error-msg {
+      color: #ff9ca5;
+      margin: 12px 0 0;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    progress {
+      width: 100%;
+      height: 14px;
+      accent-color: var(--accent-mint);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    /* -------------------------------------------------------------
+       Metrics Grid
+    ------------------------------------------------------------- */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .metric-card {
+      padding: 18px;
+      border: 1px solid var(--border-panel);
+      border-radius: 12px;
+      background: var(--bg-metric);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .metric-card span {
+      font-size: 13px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .metric-card strong {
+      font-size: 30px;
+      display: block;
+      margin-top: 6px;
+      color: var(--accent-mint);
+      font-weight: 800;
+    }
+
+    /* -------------------------------------------------------------
+       Finding Cards & Tags
+    ------------------------------------------------------------- */
+    .finding-card {
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 14px 0;
+      background: var(--bg-card);
+      transition: border-color 0.2s;
+    }
+
+    .finding-card:hover {
+      border-color: #354a72;
+    }
+
+    .finding-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .finding-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .badge-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .pill {
+      font-size: 12px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .pill.Critical {
+      background: #75273c;
+      color: #ffb8c7;
+    }
+
+    .pill.High {
+      background: #9a4725;
+      color: #ffd0b8;
+    }
+
+    .pill.Medium {
+      background: #8c7224;
+      color: #fff0b8;
+    }
+
+    .pill.Low {
+      background: #276c5a;
+      color: #b8ffea;
+    }
+
+    .source-badge {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: #1f2b42;
+      color: #9cb2d6;
+      border: 1px solid #334568;
+      font-weight: 500;
+    }
+
+    .source-badge.merged {
+      background: #123a38;
+      color: #6fe5c6;
+      border: 1px solid #23655a;
+    }
+
+    .finding-body {
+      line-height: 1.65;
+      margin: 0;
+      font-size: 14px;
+    }
+
+    .evidence-lines {
+      color: var(--accent-mint);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .actor-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: #18233a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #adc6f3;
+      font-size: 13px;
+    }
+
+    .btn-download {
+      background: #25334f;
+      color: #e5edff;
+      border: 0;
+      border-radius: 7px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .btn-download:hover {
+      background: #334468;
+    }
+
+    .warning-box {
+      margin-top: 20px;
+      padding: 16px;
+      background: #251c14;
+      border: 1px solid #63431d;
+      border-radius: 10px;
+      color: #e8bf8c;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .app-footer {
+      margin-top: 40px;
+      text-align: center;
+      color: #62728f;
+      font-size: 13px;
+    }
+
+    @media (max-width: 680px) {
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .panel-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <!-- Header Section -->
+    <header class="app-header">
+      <div class="brand">Cultive8 Security Lab</div>
+      <h1 class="hero-title">Local AI Log Analyzer</h1>
+      <p class="subtitle">Offline-capable security investigation &bull; Qwen3.5 0.8B &bull; Evidence-linked cross-file findings</p>
+    </header>
+
+    <!-- Step 01: File Upload Panel -->
+    <section class="panel" id="uploadPanel">
+      <h2 class="panel-header">01 / Analyze a server log</h2>
+      <div class="file-input-wrapper">
+        <label for="file" class="status-text" style="display:block; margin-bottom: 8px;">Select a server log file (.log or .txt):</label>
+        <input id="file" type="file" accept=".txt,.log" aria-label="Upload log file">
+      </div>
+      <div class="action-row">
+        <button id="start" class="btn-primary">Start analysis</button>
+        <span id="health" class="status-text">Checking local model…</span>
+      </div>
+      <p id="error" class="error-msg"></p>
+    </section>
+
+    <!-- Step 02: Processing Progress Panel -->
+    <section class="panel" id="progressPanel" hidden>
+      <h2 class="panel-header">02 / Processing Analysis</h2>
+      <p id="status" class="status-text">Waiting…</p>
+      <progress id="progress" value="0" max="100"></progress>
+      <p id="ram" class="status-text" style="margin-top: 10px; font-size: 13px;"></p>
+    </section>
+
+    <!-- Step 03: Consolidated Report Panel -->
+    <section class="panel" id="report" hidden>
+      <div class="panel-header">
+        <span>03 / Consolidated Security Report</span>
+        <button class="btn-download" id="export">Export JSON Report</button>
+      </div>
+
+      <!-- Metrics Overview Grid -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <span>Total Findings</span>
+          <strong id="total">0</strong>
+        </div>
+        <div class="metric-card">
+          <span>Critical Severity</span>
+          <strong id="critical" style="color: #ff9ca5;">0</strong>
+        </div>
+        <div class="metric-card">
+          <span>High Severity</span>
+          <strong id="high" style="color: #ffd0b8;">0</strong>
+        </div>
+        <div class="metric-card">
+          <span>Analyzed Chunks</span>
+          <strong id="chunks">0</strong>
+        </div>
+      </div>
+
+      <!-- Findings List Container -->
+      <div id="findings"></div>
+
+      <!-- Warning Notification Box -->
+      <div id="warningContainer" class="warning-box" hidden>
+        <strong>Warnings / Model Retries Encountered:</strong>
+        <div id="warnings" style="margin-top: 8px;"></div>
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      Cultive8 Security Lab &bull; Strictly Local Inference &bull; Model: Qwen3.5 0.8B (Ollama)
+    </footer>
+  </main>
+
+  <!-- Client-side Logic -->
+  <script>
+    const $ = (id) => document.getElementById(id);
+    let current = null;
+    let latest = null;
+    let poll = null;
+
+    function escapeHTML(str) {
+      return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[c]));
+    }
+
+    async function checkHealth() {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        $('health').textContent =
+          data.ollama === 'online' && data.model_installed
+            ? 'Model ready: ' + data.model
+            : 'Model unavailable — run ollama pull ' + data.model;
+      } catch (err) {
+        $('health').textContent = 'Backend unreachable';
+      }
+    }
+
+    checkHealth();
+
+    $('start').onclick = async () => {
+      const file = $('file').files[0];
+      if (!file) {
+        $('error').textContent = 'Please choose a .log or .txt file first';
+        return;
+      }
+      $('error').textContent = '';
+      $('start').disabled = true;
+      $('report').hidden = true;
+      $('progressPanel').hidden = false;
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const res = await fetch('/api/analyze', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Upload failed');
+        current = data.job_id;
+        await pollStatus();
+        poll = setInterval(pollStatus, 1800);
+      } catch (err) {
+        $('error').textContent = err.message;
+        $('start').disabled = false;
+      }
+    };
+
+    async function pollStatus() {
+      if (!current) return;
+      try {
+        const res = await fetch('/api/jobs/' + current);
+        const data = await res.json();
+        latest = data;
+
+        const pct = data.total ? Math.floor((100 * data.progress) / data.total) : 0;
+        $('progress').value = pct;
+        $('status').textContent =
+          data.status.toUpperCase() + ' · ' + data.progress + ' / ' + data.total + ' chunks · ' + pct + '%';
+        $('ram').textContent = 'Backend RAM: ' + data.ram_mb + ' MB (Ollama model process runs separately)';
+
+        if (data.status === 'done' || data.status === 'failed') {
+          clearInterval(poll);
+          $('start').disabled = false;
+          if (data.status === 'failed') {
+            $('error').textContent = data.error || 'Analysis failed';
+          } else {
+            renderReport(data);
+          }
+        }
+      } catch (err) {
+        $('error').textContent = 'Status error: ' + err.message;
+        clearInterval(poll);
+        $('start').disabled = false;
+      }
+    }
+
+    function renderReport(data) {
+      const findings = data.findings || [];
+      $('report').hidden = false;
+      $('total').textContent = findings.length;
+      $('critical').textContent = findings.filter((x) => x.severity === 'Critical').length;
+      $('high').textContent = findings.filter((x) => x.severity === 'High').length;
+      $('chunks').textContent = data.progress;
+      $('findings').replaceChildren();
+
+      if (!findings.length) {
+        const emptyMsg = document.createElement('p');
+        emptyMsg.className = 'status-text';
+        emptyMsg.textContent = 'No evidence-backed suspicious patterns found in this log.';
+        $('findings').appendChild(emptyMsg);
+      }
+
+      for (const item of findings) {
+        const card = document.createElement('article');
+        card.className = 'finding-card';
+        const isMerged = item.source && item.source.includes('+');
+        const badgeClass = isMerged ? 'source-badge merged' : 'source-badge';
+
+        card.innerHTML =
+          '<div class="finding-top">' +
+            '<div class="finding-title">' + escapeHTML(item.type) + '</div>' +
+            '<div class="badge-group">' +
+              '<span class="' + badgeClass + '">' + escapeHTML(item.source) + '</span>' +
+              '<span class="pill ' + escapeHTML(item.severity) + '">' + escapeHTML(item.severity) + '</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="finding-body">' +
+            '<b>Actor (Source IP):</b> <span class="actor-code">' + escapeHTML(item.actor) + '</span><br>' +
+            '<b>Evidence Lines:</b> <span class="evidence-lines">' +
+            (item.lines || []).map((n) => 'L' + escapeHTML(n)).join(', ') +
+            '</span><br>' +
+            '<b>Reason:</b> ' + escapeHTML(item.reason) + '<br>' +
+            '<b>Suggested Action:</b> ' + escapeHTML(item.action) +
+          '</div>';
+        $('findings').appendChild(card);
+      }
+
+      const warnings = data.warnings || [];
+      if (warnings.length > 0) {
+        $('warningContainer').hidden = false;
+        $('warnings').innerHTML = warnings.map((w) => '<div>&bull; ' + escapeHTML(w) + '</div>').join('');
+      } else {
+        $('warningContainer').hidden = true;
+      }
+    }
+
+    $('export').onclick = () => {
+      if (!latest) return;
+      const blob = new Blob([JSON.stringify(latest, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'security-report-' + current + '.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+2026-11-06 10:00:00 192.0.2.14 failed password for admin
+2026-11-06 10:00:01 192.0.2.14 failed password for admin
+2026-11-06 10:00:02 192.0.2.14 failed password for admin
+2026-11-06 10:00:03 192.0.2.14 failed password for admin
+2026-11-06 10:00:04 192.0.2.14 failed password for admin
+2026-11-06 10:00:05 192.0.2.14 accepted password for admin
+2026-11-06 10:01:00 198.51.100.25 GET /search?q=1%20union%20select%20password HTTP/1.1 500
+2026-11-06 10:02:00 203.0.113.5 GET /.env HTTP/1.1 404
+2026-11-06 10:02:01 203.0.113.5 GET /.git/config HTTP/1.1 404
+2026-11-06 10:02:02 203.0.113.5 GET /wp-admin HTTP/1.1 404
